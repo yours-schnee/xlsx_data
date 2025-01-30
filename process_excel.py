@@ -3,55 +3,60 @@ import openpyxl
 from openpyxl import Workbook
 from pathlib import Path
 
+def clean_sheet_name(name):
+    # Excelのシート名として無効な文字を除去
+    invalid_chars = [':', '/', '\\', '?', '*', '[', ']']
+    clean_name = str(name)
+    for char in invalid_chars:
+        clean_name = clean_name.replace(char, '_')
+    # シート名の長さを31文字に制限（Excelの制限）
+    return clean_name[:31]
+
 def process_multiple_excel(input_dir, output_file):
-    # 入力ディレクトリ内のすべてのxlsxファイルを取得
     excel_files = sorted(list(Path(input_dir).glob("*.xlsx")))
-    
-    # データを格納する辞書（キー：列名、値：[ファイル名, データのリスト]のリスト）
     data_dict = {}
     
-    # 各Excelファイルを処理
     for excel_file in excel_files:
-        df = pd.read_excel(excel_file)
-        
-        # 各列を処理
-        for col in df.columns:
-            # 空でない値を持つ行を取得
-            col_data = df[col][df[col].notna()]
+        try:
+            df = pd.read_excel(excel_file)
             
-            # 1行目（シート名）を取得
-            sheet_name = str(col_data.iloc[0])
-            
-            # 2行目以降のデータを取得
-            values = col_data.iloc[1:].tolist()
-            
-            # データを辞書に追加
-            if sheet_name not in data_dict:
-                data_dict[sheet_name] = []
-            # ファイル名とデータを組にして保存
-            data_dict[sheet_name].append([excel_file.name, values])
+            for col in df.columns:
+                col_data = df[col][df[col].notna()]
+                
+                if len(col_data) > 0:  # データが存在する場合のみ処理
+                    sheet_name = clean_sheet_name(str(col_data.iloc[0]))
+                    values = col_data.iloc[1:].tolist()
+                    
+                    if sheet_name not in data_dict:
+                        data_dict[sheet_name] = []
+                    data_dict[sheet_name].append([excel_file.name, values])
+        except Exception as e:
+            print(f"Error processing {excel_file}: {str(e)}")
     
-    # 新しいワークブックを作成
     wb = Workbook()
-    wb.remove(wb.active)  # デフォルトシートを削除
+    wb.remove(wb.active)
     
-    # 各シートにデータを書き込む
     for sheet_name, file_data_list in data_dict.items():
-        ws = wb.create_sheet(title=sheet_name)
-        
-        # 各ファイルのデータを別々の列に書き込む
-        for col_idx, (filename, values) in enumerate(file_data_list, start=1):
-            # ファイル名を1行目に書き込む
-            ws.cell(row=1, column=col_idx, value=filename)
+        try:
+            ws = wb.create_sheet(title=sheet_name)
             
-            # データを2行目以降に書き込む
-            for row_idx, value in enumerate(values, start=2):
-                ws.cell(row=row_idx, column=col_idx, value=value)
+            for col_idx, (filename, values) in enumerate(file_data_list, start=1):
+                ws.cell(row=1, column=col_idx, value=filename)
+                
+                for row_idx, value in enumerate(values, start=2):
+                    # データ型の検証と変換
+                    if pd.isna(value):
+                        continue
+                    ws.cell(row=row_idx, column=col_idx, value=str(value))
+        except Exception as e:
+            print(f"Error creating sheet {sheet_name}: {str(e)}")
     
-    # 結果を保存
-    wb.save(output_file)
+    try:
+        wb.save(output_file)
+        print(f"Successfully saved to {output_file}")
+    except Exception as e:
+        print(f"Error saving workbook: {str(e)}")
 
-# 使用例
 if __name__ == "__main__":
     input_directory = "excel_files"
     output_file = "combined_output.xlsx"
