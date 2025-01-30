@@ -11,7 +11,8 @@ def clean_sheet_name(name):
     return clean_name[:31]
 
 def process_multiple_excel(input_dir, output_file):
-    excel_files = sorted(list(Path(input_dir).glob("*.xlsx")))
+    # rglob を使用して再帰的にxlsxファイルを検索
+    excel_files = sorted(list(Path(input_dir).rglob("*.xlsx")))
     print(f"Found {len(excel_files)} Excel files")
     data_dict = {}
     
@@ -22,10 +23,8 @@ def process_multiple_excel(input_dir, output_file):
         
         for col in df.columns:
             print(f"\nProcessing column: {col}")
-            # 各列の内容を表示
             print(f"Column data:\n{df[col].head()}")
             
-            # 空でない値のみを取得し、内容を表示
             col_data = df[col].dropna()
             print(f"Non-empty values:\n{col_data.head()}")
             
@@ -34,7 +33,7 @@ def process_multiple_excel(input_dir, output_file):
                 values = col_data.iloc[1:].tolist()
                 
                 print(f"Sheet name: {sheet_name}")
-                print(f"Values: {values[:5]}...")  # 最初の5つの値を表示
+                print(f"Values: {values[:5]}...")
                 
                 if sheet_name not in data_dict:
                     data_dict[sheet_name] = []
