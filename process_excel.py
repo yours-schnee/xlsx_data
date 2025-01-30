@@ -10,38 +10,35 @@ def clean_sheet_name(name):
         clean_name = clean_name.replace(char, '_')
     return clean_name[:31]
 
-def process_multiple_excel(input_dir, output_file):
-    # rglob を使用して再帰的にxlsxファイルを検索
-    excel_files = sorted(list(Path(input_dir).rglob("*.xlsx")))
+def process_directory_excel(directory_path):
+    excel_files = sorted(list(Path(directory_path).glob("*.xlsx")))
+    if not excel_files:
+        return None
+    
+    print(f"\nProcessing directory: {directory_path}")
     print(f"Found {len(excel_files)} Excel files")
     data_dict = {}
     
     for excel_file in excel_files:
-        print(f"\nProcessing file: {excel_file}")
+        print(f"Processing file: {excel_file}")
         df = pd.read_excel(excel_file)
-        print(f"Columns found: {df.columns.tolist()}")
         
         for col in df.columns:
-            print(f"\nProcessing column: {col}")
-            print(f"Column data:\n{df[col].head()}")
-            
             col_data = df[col].dropna()
-            print(f"Non-empty values:\n{col_data.head()}")
             
             if len(col_data) >= 1:
                 sheet_name = clean_sheet_name(str(col_data.iloc[0]))
                 values = col_data.iloc[1:].tolist()
                 
-                print(f"Sheet name: {sheet_name}")
-                print(f"Values: {values[:5]}...")
-                
                 if sheet_name not in data_dict:
                     data_dict[sheet_name] = []
                 data_dict[sheet_name].append([excel_file.name, values])
     
-    print("\nCollected data summary:")
-    for sheet_name, data in data_dict.items():
-        print(f"Sheet: {sheet_name}, Files: {len(data)}")
+    return data_dict
+
+def save_workbook(data_dict, output_file):
+    if not data_dict:
+        return
     
     wb = Workbook()
     default_sheet = wb.active
@@ -61,9 +58,23 @@ def process_multiple_excel(input_dir, output_file):
         wb.remove(default_sheet)
     
     wb.save(output_file)
-    print(f"\nSaved to {output_file}")
+    print(f"Saved to {output_file}")
+
+def process_multiple_excel(input_dir):
+    root_path = Path(input_dir)
+    
+    # サブディレクトリを取得
+    subdirs = [d for d in root_path.iterdir() if d.is_dir()]
+    print(f"Found {len(subdirs)} subdirectories")
+    
+    # 各サブディレクトリに対して処理を実行
+    for subdir in subdirs:
+        data_dict = process_directory_excel(subdir)
+        if data_dict:
+            # サブディレクトリ名を出力ファイル名に使用
+            output_file = root_path / f"{subdir.name}_output.xlsx"
+            save_workbook(data_dict, output_file)
 
 if __name__ == "__main__":
     input_directory = "excel_files"
-    output_file = "combined_output.xlsx"
-    process_multiple_excel(input_directory, output_file)
+    process_multiple_excel(input_directory)
