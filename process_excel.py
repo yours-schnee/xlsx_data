@@ -4,12 +4,10 @@ from openpyxl import Workbook
 from pathlib import Path
 
 def clean_sheet_name(name):
-    # Excelのシート名として無効な文字を除去
     invalid_chars = [':', '/', '\\', '?', '*', '[', ']']
     clean_name = str(name)
     for char in invalid_chars:
         clean_name = clean_name.replace(char, '_')
-    # シート名の長さを31文字に制限（Excelの制限）
     return clean_name[:31]
 
 def process_multiple_excel(input_dir, output_file):
@@ -23,7 +21,7 @@ def process_multiple_excel(input_dir, output_file):
             for col in df.columns:
                 col_data = df[col][df[col].notna()]
                 
-                if len(col_data) > 0:  # データが存在する場合のみ処理
+                if len(col_data) > 0:
                     sheet_name = clean_sheet_name(str(col_data.iloc[0]))
                     values = col_data.iloc[1:].tolist()
                     
@@ -34,7 +32,9 @@ def process_multiple_excel(input_dir, output_file):
             print(f"Error processing {excel_file}: {str(e)}")
     
     wb = Workbook()
-    wb.remove(wb.active)
+    # デフォルトシートを保持し、名前を変更
+    default_sheet = wb.active
+    default_sheet.title = "Sheet1"
     
     for sheet_name, file_data_list in data_dict.items():
         try:
@@ -44,12 +44,15 @@ def process_multiple_excel(input_dir, output_file):
                 ws.cell(row=1, column=col_idx, value=filename)
                 
                 for row_idx, value in enumerate(values, start=2):
-                    # データ型の検証と変換
                     if pd.isna(value):
                         continue
                     ws.cell(row=row_idx, column=col_idx, value=str(value))
         except Exception as e:
             print(f"Error creating sheet {sheet_name}: {str(e)}")
+    
+    # データがない場合はデフォルトシートを保持、ある場合は削除
+    if len(data_dict) > 0:
+        wb.remove(default_sheet)
     
     try:
         wb.save(output_file)
